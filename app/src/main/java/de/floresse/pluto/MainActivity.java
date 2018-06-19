@@ -676,8 +676,13 @@ public class MainActivity extends Activity
 
         @Override
         public void afterTextChanged(Editable s) {
-            vifs.get(i).preis = (s.length() > 0) ? Float.valueOf(s.toString()) : 0f;
-            preisges(i);
+            try {
+                vifs.get(i).preis = (s.length() > 0) ? Float.parseFloat(s.toString()) : 0f;
+                preisges(i);
+            }
+            catch (NumberFormatException e) {
+
+            }
         }
 
         @Override
