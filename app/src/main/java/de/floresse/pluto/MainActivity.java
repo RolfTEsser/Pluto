@@ -2,11 +2,8 @@ package de.floresse.pluto;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.IntentSender;
-import android.media.Ringtone;
-import android.media.RingtoneManager;
+import android.content.Intent;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputFilter;
@@ -21,33 +18,27 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Toast;
+import android.widget.Toolbar;
 
 
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GooglePlayServicesUtil;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.GoogleApiClient.ConnectionCallbacks;
-import com.google.android.gms.common.api.GoogleApiClient.OnConnectionFailedListener;
-import com.google.android.gms.common.api.ResultCallback;
-import com.google.android.gms.drive.Drive;
-import com.google.android.gms.drive.DriveApi;
-import com.google.android.gms.drive.DriveContents;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.api.Scope;
 import com.google.android.gms.drive.DriveFile;
-import com.google.android.gms.drive.DriveId;
-import com.google.android.gms.drive.DriveApi.DriveContentsResult;
-import com.google.android.gms.drive.DriveApi.DriveIdResult;
-import com.google.android.gms.drive.DriveFolder.DriveFileResult;
-import com.google.android.gms.drive.Metadata;
-import com.google.android.gms.drive.MetadataBuffer;
 import com.google.android.gms.drive.MetadataChangeSet;
-import com.google.android.gms.drive.query.Filters;
-import com.google.android.gms.drive.query.Query;
-import com.google.android.gms.drive.query.SearchableField;
+import com.google.api.client.extensions.android.http.AndroidHttp;
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.services.drive.DriveScopes;
+import com.google.api.services.drive.model.File;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.OutputStream;
 import java.math.RoundingMode;
 import java.sql.Timestamp;
 import java.text.DecimalFormat;
@@ -56,22 +47,24 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Vector;
 
-public class MainActivity extends Activity
-        implements ConnectionCallbacks,
-        OnConnectionFailedListener {
+import de.floresse.drivefile.DriveServiceHelper;
+
+public class MainActivity extends Activity {
 
     private static final String LogTAG = "Pluto";
-    private static final int REQUEST_CODE_RESOLUTION = 3;
     public static final String filename = "pluto.txt";
 
-    private GoogleApiClient mGoogleApiClient;
+    public static final int REQUEST_CODE_SIGN_IN = 11;
+    private static final int REQUEST_CODE_OPEN_DOCUMENT = 12;
 
     private DriveFile driveFile = null;
     private MetadataChangeSet changeSet = null;
     private String timestamp = "";
+    private String timestamp_vergl = "";
     private Boolean newFile = false;
-
+    private ScrollView sv = null;
     private LinearLayout llges = null;
+    private MyDriveServiceHelper mDriveServiceHelper;
 
     private ArrayList<LinearLayout> llline = new ArrayList<>();
 
@@ -81,6 +74,9 @@ public class MainActivity extends Activity
     private Float preisgessum = 0f;
     private EditText etPreisgessum = null;
 
+    private int driveFilecount = 0;
+    private String driveFileId;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,59 +84,36 @@ public class MainActivity extends Activity
 
         setContentView(R.layout.activity_main);
         Log.i(LogTAG, "Hier ist Pluto");
-        ScrollView sv = findViewById(R.id.scroll);
+
+        final Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        toolbar.setLogo(R.mipmap.ic_launcher);
+        toolbar.setTitle("Pluto");
+        setActionBar(toolbar);
+
+        sv = findViewById(R.id.scroll);
         llges = new LinearLayout(this);
         llges.setOrientation(LinearLayout.VERTICAL);
         sv.addView(llges);
 
         etPreisgessum = findViewById(R.id.preisgessum);
 
-        // Create a GoogleApiClient instance
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addApi(Drive.API)
-                .addScope(Drive.SCOPE_FILE)
-                //		.addScope(Drive.SCOPE_APPFOLDER)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .build();
-        mGoogleApiClient.connect();
+        requestSignIn();
 
-        //Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
-        //setActionBar(toolbar);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         deleteEmptyLines();
-        writeDriveFile();
-    }
-
-    @Override
-    public void onConnected(Bundle ch) {
-        Log.i(LogTAG, "onConnected: GoogleDrive connected");
-        readDriveFile();
-    }
-
-    @Override
-    public void onConnectionSuspended(int cause) {
-        Log.i(LogTAG, "GoogleDrive connection suspended");
-    }
-
-    @Override
-    public void onConnectionFailed(ConnectionResult connectionResult) {
-        Log.i(LogTAG, "GoogleDrive connection failed");
-        if (connectionResult.hasResolution()) {
-            try {
-                connectionResult.startResolutionForResult(this, REQUEST_CODE_RESOLUTION);
-            } catch (IntentSender.SendIntentException e) {
-                // Unable to resolve, message user appropriately
+            Log.i(LogTAG, "files are not equal : writeDriveFile");
+            if (newFile) {
+                //hier create und save
+                createFile();
+            } else {
+                //readTimestamp und save
+                readTimestamp(driveFileId);
             }
-        } else {
-            GooglePlayServicesUtil.getErrorDialog(connectionResult.getErrorCode(), this, 0).show();
-        }
     }
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -166,6 +139,210 @@ public class MainActivity extends Activity
         }
 
         return super.onOptionsItemSelected(item);
+    }
+    private void requestSignIn() {
+        Log.d(LogTAG, "Requesting sign-in");
+
+        GoogleSignInOptions signInOptions =
+                new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                        .requestEmail()
+                        .requestScopes(new Scope(DriveScopes.DRIVE_FILE))
+                        .build();
+        GoogleSignInClient client = GoogleSignIn.getClient(this, signInOptions);
+
+        // The result of the sign-in Intent is handled in onActivityResult.
+        GoogleSignInAccount googleAccount = GoogleSignIn.getLastSignedInAccount(this);
+        if (googleAccount==null) {
+            startActivityForResult(client.getSignInIntent(), REQUEST_CODE_SIGN_IN);
+        } else {
+            hasAccount(googleAccount);
+        }
+    }
+
+    private void hasAccount(GoogleSignInAccount googleAccount) {
+        // Use the authenticated account to sign in to the Drive service.
+        GoogleAccountCredential credential =
+                GoogleAccountCredential.usingOAuth2(
+                        this, Collections.singleton(DriveScopes.DRIVE_FILE));
+        credential.setSelectedAccount(googleAccount.getAccount());
+        com.google.api.services.drive.Drive googleDriveService =
+                new com.google.api.services.drive.Drive.Builder(
+                        AndroidHttp.newCompatibleTransport(),
+                        new GsonFactory(),
+                        credential)
+                        .setApplicationName("Pluto")
+                        .build();
+
+        // The DriveServiceHelper encapsulates all REST API and SAF functionality.
+        // Its instantiation is required before handling any onClick actions.
+        mDriveServiceHelper = new MyDriveServiceHelper(googleDriveService);
+
+        queryFile();
+
+    }
+    private void queryFile() {
+        if (mDriveServiceHelper != null) {
+            Log.d(LogTAG, "Querying for files.");
+            driveFileId="";
+            driveFilecount=0;
+            mDriveServiceHelper.queryDriveFiles()
+                    .addOnSuccessListener(fileList -> {
+                        for (File file : fileList.getFiles()) {
+                            Log.i(LogTAG, "queryFile filename : " + file.getName() + " " + file.getId());
+                            if (file.getName().equalsIgnoreCase(filename)) {
+                                driveFileId = file.getId();
+                                driveFilecount++;
+                            }
+                        }
+                        Log.i(LogTAG, filename + " count : " + driveFilecount);
+                        switch(driveFilecount) {
+                            case 0:
+                                newFile=true;
+                                onLoadDone();
+                                break;
+                            case 1:
+                                newFile=false;
+                                readFile(driveFileId);
+                                break;
+                            default:
+                                newFile=false;
+                                Log.i(LogTAG, "Drive: zu viele Treffer");
+                                Toast.makeText(this, "zu viele Treffer " + filename, Toast.LENGTH_LONG).show();
+                                //TODO hier FilePicker aufrufen und irg.wie FileId rauskriegen
+                        }
+                    })
+                    .addOnFailureListener(exception -> Log.e(LogTAG, "Unable to query files.", exception));
+        }
+    }
+
+    private void openFilePicker() {
+        if (mDriveServiceHelper != null) {
+            Log.d(LogTAG, "Opening file picker.");
+
+            Intent pickerIntent = mDriveServiceHelper.createFilePickerIntent();
+
+            // The result of the SAF Intent is handled in onActivityResult.
+            startActivityForResult(pickerIntent, REQUEST_CODE_OPEN_DOCUMENT);
+        }
+    }
+
+    private void openFileFromFilePicker(Uri uri) {
+        if (mDriveServiceHelper != null) {
+            Log.d(LogTAG, "Opening " + uri.getPath());
+
+            mDriveServiceHelper.openFileUsingStorageAccessFramework(getContentResolver(), uri)
+                    .addOnSuccessListener(readResult -> {
+                        String timestamp = (String) readResult.get(0);
+                        ArrayList<ifs> vifs = (ArrayList<ifs>) readResult.get(1);
+                        try {
+
+                        } catch (Exception e) {
+
+                        }
+                    })
+                    .addOnFailureListener(exception ->
+                            Log.e(LogTAG, "Unable to open file from picker.", exception));
+        }
+    }
+
+    private void createFile() {
+        if (mDriveServiceHelper != null) {
+            Log.d(LogTAG, "Creating a file.");
+
+            mDriveServiceHelper.createDriveFile(filename)
+                    .addOnSuccessListener(fileId -> saveFile(fileId))
+                    .addOnFailureListener(exception ->
+                            Log.e(LogTAG, "Couldn't create file.", exception));
+        }
+    }
+
+    private void readFile(String fileId) {
+        if (mDriveServiceHelper != null) {
+            Log.d(LogTAG, "Reading file " + fileId);
+
+            mDriveServiceHelper.readDriveFile(fileId)
+                    .addOnSuccessListener(readResult -> {
+                        timestamp = (String) readResult.get(0);
+                        vifs = (ArrayList<ifs>) readResult.get(1);
+
+                        onLoadDone();
+
+                    })
+                    .addOnFailureListener(exception ->
+                            Log.e(LogTAG, "Couldn't read file.", exception));
+        }
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent resultData) {
+        switch (requestCode) {
+            case REQUEST_CODE_SIGN_IN:
+                if (resultCode == Activity.RESULT_OK && resultData != null) {
+                    handleSignInResult(resultData);
+                }
+                break;
+
+            case REQUEST_CODE_OPEN_DOCUMENT:
+                if (resultCode == Activity.RESULT_OK) {
+                    if (resultData != null) {
+                        Uri uri = resultData.getData();
+                        if (uri != null) {
+                            openFileFromFilePicker(uri);
+                        }
+                    } else {
+                        //TODO neu anlegen
+
+                    }
+                }
+                break;
+        }
+
+        super.onActivityResult(requestCode, resultCode, resultData);
+    }
+
+
+    private void handleSignInResult(Intent result) {
+        GoogleSignIn.getSignedInAccountFromIntent(result)
+                .addOnSuccessListener(googleAccount -> {
+                    Log.d(LogTAG, "Signed in as " + googleAccount.getEmail());
+
+                    hasAccount(googleAccount);
+
+                })
+                .addOnFailureListener(exception -> Log.e(LogTAG, "Unable to sign in.", exception));
+    }
+
+    private void readTimestamp(String fileId) {
+        if (mDriveServiceHelper != null) {
+            Log.d(LogTAG, "Reading timestamp from file " + fileId);
+
+            mDriveServiceHelper.readDriveFile(fileId)
+                    .addOnSuccessListener(readResult -> {
+                        timestamp_vergl = (String) readResult.get(0);
+                        if (timestamp.equals(timestamp_vergl)) {
+                            saveFile(fileId);
+                        } else {
+                            Toast.makeText(this, "von anderem Dagobert überholt", Toast.LENGTH_LONG).show();
+                        }
+                    })
+                    .addOnFailureListener(exception ->
+                            Log.e(LogTAG, "Couldn't read file.", exception));
+        }
+    }
+
+    private void saveFile(String fileId) {
+        if (mDriveServiceHelper != null && fileId != null) {
+            Log.d(LogTAG, "Saving " + fileId);
+
+            timestamp = new Timestamp(new Date().getTime()).toString();
+            Vector<Object> inp = new Vector<>();
+            inp.add(0, timestamp);
+            inp.add(1, vifs);
+
+            mDriveServiceHelper.saveDriveFile(fileId, filename, inp)
+                    .addOnFailureListener(exception ->
+                            Log.e(LogTAG, "Unable to save file via REST.", exception));
+        }
     }
 
     public boolean alleProdukteBelegt() {
@@ -204,7 +381,10 @@ public class MainActivity extends Activity
             belegenETs(i);
         }
 
+        sv.smoothScrollTo(0,0);
+
     }
+
     public void onLoadDone() {
 
         Collections.sort(vifs);
@@ -348,263 +528,6 @@ public class MainActivity extends Activity
             neueZeile(i);
 
             vifs.add(new ifs());
-        }
-    }
-
-    public void writeDriveFile() {
-        // create new contents resource
-        if (newFile){
-            Log.i(LogTAG, "creating newDriveContents");
-            Drive.DriveApi.newDriveContents(mGoogleApiClient)
-                    .setResultCallback(driveContentsCallback);
-        } else {
-            if (driveFile!=null) {
-                new RetrieveTSDriveFileContentsAsyncTask().execute(driveFile);
-            }
-        }
-    }
-
-    public void readDriveFile() {
-        // create new contents resource
-        Query query = new Query.Builder()
-                .addFilter(Filters.contains(SearchableField.TITLE, filename))
-                .build();
-        Drive.DriveApi.query(mGoogleApiClient, query)
-                .setResultCallback(metadataCallback);
-    }
-
-    // [START drive_contents_callback]
-    final private ResultCallback<DriveContentsResult> driveContentsCallback =
-            new ResultCallback<DriveContentsResult>() {
-                @Override
-                public void onResult(DriveContentsResult result) {
-                    if (!result.getStatus().isSuccess()) {
-                        Log.i(LogTAG, "Error while trying to create new file contents");
-                        return;
-                    }
-                    changeSet = new MetadataChangeSet.Builder()
-                            .setTitle(filename)
-                            .setMimeType("text/plain")
-                            .build();
-                    Drive.DriveApi.getRootFolder(mGoogleApiClient)
-                            .createFile(mGoogleApiClient, changeSet, result.getDriveContents())
-                            .setResultCallback(fileCallback);
-                }
-            };
-    // [END drive_contents_callback]
-
-    final private ResultCallback<DriveFileResult> fileCallback = new
-            ResultCallback<DriveFileResult>() {
-                @Override
-                public void onResult(DriveFileResult result) {
-                    if (!result.getStatus().isSuccess()) {
-                        Log.i(LogTAG, "Error while trying to create the file");
-                        return;
-                    }
-                    Log.i(LogTAG, "Created a file in App Folder: "
-                            + result.getDriveFile().getDriveId());
-                    DriveFile driveFile = result.getDriveFile();
-                    new EditContentsAsyncTask().execute(driveFile);
-                }
-            };
-
-    final private ResultCallback<DriveApi.MetadataBufferResult> metadataCallback =
-            new ResultCallback<DriveApi.MetadataBufferResult>() {
-                @Override
-                public void onResult(DriveApi.MetadataBufferResult result) {
-                    if (!result.getStatus().isSuccess()) {
-                        Log.e(LogTAG, "Problem while retrieving results");
-                        return;
-                    }
-                    int vers = 0;
-                    MetadataBuffer mdb = null;
-                    try {
-                        mdb = result.getMetadataBuffer();
-                        for (Metadata md : mdb) {
-                            if (md == null || !md.isDataValid() || md.isTrashed()) continue;
-                            vers++;
-                            // collect files
-                            DriveId driveId = md.getDriveId();
-                            Log.i(LogTAG, "found " + driveId);
-                            Drive.DriveApi.fetchDriveId(mGoogleApiClient, driveId.getResourceId())
-                                    .setResultCallback(idCallback);
-                        }
-                    } finally {
-                        if (mdb != null) mdb.release();
-                    }
-                    switch(vers) {
-                        case 0:
-                            newFile=true;
-                            onLoadDone();
-                            break;
-                        case 1:
-                            newFile=false;
-                            break;
-                        default:
-                            newFile=false;
-                            Log.e(LogTAG, "Drive: zu viele Treffer");
-                    }
-                    Log.i(LogTAG, "Anz Treffer : " + vers + " " + newFile);
-                }
-            };
-
-    public class EditContentsAsyncTask extends AsyncTask<DriveFile, Void, Boolean> {
-
-        @Override
-        protected Boolean doInBackground(DriveFile... args) {
-            DriveFile file = args[0];
-            newFile=false;
-            try {
-                DriveContentsResult driveContentsResult = file.open(
-                        mGoogleApiClient, DriveFile.MODE_WRITE_ONLY, null).await();
-                if (!driveContentsResult.getStatus().isSuccess()) {
-                    return false;
-                }
-                String timestamp = new Timestamp(new Date().getTime()).toString();
-                MainActivity.this.timestamp = timestamp;
-
-                DriveContents driveContents = driveContentsResult.getDriveContents();
-                OutputStream os = driveContents.getOutputStream();
-                ObjectOutputStream oos = new ObjectOutputStream(os);
-
-                oos.writeObject(timestamp);
-                oos.writeObject(vifs.size());
-
-                for (int i=0;i<vifs.size();i++) {
-                    oos.writeObject(vifs.get(i).anzahl);
-                    oos.writeObject(vifs.get(i).produkt);
-                    oos.writeObject(vifs.get(i).preis);
-                }
-                oos.flush();
-                oos.close();
-
-                com.google.android.gms.common.api.Status status =
-                        driveContents.commit(mGoogleApiClient, changeSet).await();
-                return status.getStatus().isSuccess();
-            } catch (IOException e) {
-                Log.e(LogTAG, "IOException while writing to the output stream", e);
-            }
-            return false;
-        }
-
-        @Override
-        protected void onPostExecute(Boolean result) {
-            if (!result) {
-                Log.e(LogTAG, "Error while editing contents");
-                return;
-            }
-            Log.i(LogTAG, "Successfully edited contents");
-        }
-    } // end class AsyncTask
-
-    final private ResultCallback<DriveIdResult> idCallback = new ResultCallback<DriveIdResult>() {
-        @Override
-        public void onResult(DriveIdResult result) {
-            driveFile = result.getDriveId().asDriveFile();
-            new RetrieveDriveFileContentsAsyncTask().execute(driveFile);
-        }
-    };
-
-    final private class RetrieveDriveFileContentsAsyncTask
-            extends AsyncTask<DriveFile, Boolean, String> {
-
-        @Override
-        protected String doInBackground(DriveFile... args) {
-            String contents = null;
-            DriveFile file = args[0];
-            DriveContentsResult driveContentsResult =
-                    file.open(mGoogleApiClient, DriveFile.MODE_READ_ONLY, null).await();
-            if (!driveContentsResult.getStatus().isSuccess()) {
-                return null;
-            }
-            DriveContents driveContents = driveContentsResult.getDriveContents();
-            try {
-                ObjectInputStream ois = new ObjectInputStream(driveContents.getInputStream());
-
-                timestamp = (String) ois.readObject();
-                int size = (Integer) ois.readObject();
-
-                for (int i=0;i<size;i++) {
-                    vifs.add(new ifs());
-                    vifs.get(i).anzahl = (Integer) ois.readObject();
-                    vifs.get(i).produkt = (String) ois.readObject();
-                    vifs.get(i).preis = (Float) ois.readObject();
-                    vifs.get(i).preisges = 0f;
-                }
-
-                ois.close();
-            } catch (IOException e) {
-                Log.e(LogTAG, "IOException while reading the input stream", e);
-                ///*
-            } catch (ClassNotFoundException e) {
-                Log.e(LogTAG, "ClassNotFoundException while reading the stream", e);
-                //*/
-            }
-            driveContents.discard(mGoogleApiClient);
-            return contents;
-        }
-
-        @Override
-        protected void onPostExecute(String result) {
-            super.onPostExecute(result);
-
-            onLoadDone();
-
-        }
-    }
-
-    final private class RetrieveTSDriveFileContentsAsyncTask
-            extends AsyncTask<DriveFile, Boolean, String> {
-
-        @Override
-        protected String doInBackground(DriveFile... args) {
-            String timestamp = "";
-            DriveFile file = args[0];
-            DriveContentsResult driveContentsResult =
-                    file.open(mGoogleApiClient, DriveFile.MODE_READ_ONLY, null).await();
-            if (!driveContentsResult.getStatus().isSuccess()) {
-                Log.e(LogTAG, "Error while reading the DriveFile " + driveContentsResult +
-                        "/" + driveContentsResult.getStatus().getStatusCode() +
-                        "/" + driveContentsResult.getStatus().getStatusMessage());
-                return "";
-            }
-            DriveContents driveContents = driveContentsResult.getDriveContents();
-            try {
-                ObjectInputStream ois = new ObjectInputStream(driveContents.getInputStream());
-
-                timestamp = (String) ois.readObject();
-
-                ois.close();
-            } catch (IOException e) {
-                Log.e(LogTAG, "IOException while reading the input stream", e);
-                ///*
-            } catch (ClassNotFoundException e) {
-                Log.e(LogTAG, "ClassNotFoundException while reading the stream", e);
-                //*/
-            }
-            driveContents.discard(mGoogleApiClient);
-            return timestamp;
-        }
-
-        @Override
-        protected void onPostExecute(String timestamp) {
-            super.onPostExecute(timestamp);
-            //Log.i(LogTAG, "Timestamp (alt) :" + MainActivity.this.timestamp);
-            //Log.i(LogTAG, "Timestamp (neu) :" + timestamp);
-            Log.i(LogTAG, "onPostExecute : " + timestamp + " / " + MainActivity.this.timestamp);
-            if (timestamp.equals(MainActivity.this.timestamp)) {
-                new EditContentsAsyncTask().execute(driveFile);
-            } else {
-                try {
-                    Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-                    Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
-                    r.play();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                Log.i(LogTAG, "DriveFile - überholt");
-                Toast.makeText(MainActivity.this, "Timestamp - Error Google DriveFile", Toast.LENGTH_LONG).show();
-            }
         }
     }
 
@@ -761,4 +684,69 @@ public class MainActivity extends Activity
 
         }
     }
+
+    public class MyDriveServiceHelper extends DriveServiceHelper {
+
+        public MyDriveServiceHelper(com.google.api.services.drive.Drive drive) {
+            super(drive);
+        }
+
+        @Override
+        public Vector<Object> readFile(InputStream is) {
+            String timestamp = null;
+            ArrayList<ifs> vifs = new ArrayList<ifs>();
+            Vector<Object> readResult = new Vector<>();
+
+            try (ObjectInputStream ois = new ObjectInputStream(is);)
+            {
+
+                timestamp = (String) ois.readObject();
+                int size = (Integer) ois.readObject();
+
+                for (int i=0;i<size;i++) {
+                    vifs.add(new ifs());
+                    vifs.get(i).anzahl = (Integer) ois.readObject();
+                    vifs.get(i).produkt = (String) ois.readObject();
+                    vifs.get(i).preis = (Float) ois.readObject();
+                    vifs.get(i).preisges = 0f;
+                }
+                ois.close();
+
+            } catch (Exception e) {
+                Log.i(LogTAG, "Exception bei Drive-File read : " + e.toString());
+                vifs=null;
+            }
+
+            readResult.add(0, timestamp);
+            readResult.add(1, vifs);
+
+            return readResult;
+        }
+
+        @Override
+        public void saveFile(ByteArrayOutputStream baos, Vector<Object> inp) {
+
+            String timestamp = (String) inp.get(0);
+            ArrayList<ifs> vifs = (ArrayList<ifs>) inp.get(1);
+
+            try (ObjectOutputStream oos = new ObjectOutputStream(baos);)
+            {
+                oos.writeObject(timestamp);
+                oos.writeObject(vifs.size());
+
+                for (int i=0;i<vifs.size();i++) {
+                    oos.writeObject(vifs.get(i).anzahl);
+                    oos.writeObject(vifs.get(i).produkt);
+                    oos.writeObject(vifs.get(i).preis);
+                }
+                oos.flush();
+                oos.close();
+            } catch (IOException e) {
+                Log.i(LogTAG, "IOException Drive-File : " + e.toString());
+            }
+
+        }
+
+    }
+
 }

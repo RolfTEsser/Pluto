@@ -1,106 +1,129 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/map"
-    android:orientation="vertical"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    tools:context="de.floresse.pluto.MainActivity"
-    >
-    <LinearLayout
-        android:id="@+id/oben"
-        android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentTop="true">
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text=""/>
-    </LinearLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/oben"
-        android:layout_above="@id/unten"
-        >
-        <ScrollView
-            android:id="@+id/scroll"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            >
-        </ScrollView>
-    </LinearLayout>
-    <LinearLayout
-        android:id="@+id/unten"
+        android:layout_gravity="right|bottom"
+        app:fabSize="mini"
+        app:backgroundTint="@color/mystatusbar_light"
+        app:rippleColor="#880000"
+        app:elevation="6dp"
+        app:borderWidth="0dp"
+        android:onClick="clicked"
+        android:src="@drawable/baseline_done_black_48"
+        android:layout_marginBottom="80dp"
+        android:layout_marginRight="14dp"/>
+
+    <RelativeLayout
+        android:id="@+id/map"
         android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true">
+        tools:context="de.floresse.pluto.MainActivity"
+        >
 
-        <TextView
+        <android.widget.Toolbar
+            android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="2dp"
-            android:background="#dddddddd"
-            android:layout_above="@id/ganzunten"
-            android:layout_marginLeft="40dp"
-            android:layout_marginTop="25dp"
-            android:layout_marginBottom="25dp"
-            android:layout_marginRight="40dp" />
-    <LinearLayout
-        android:id="@+id/ganzunten"
-        android:orientation="horizontal"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="25dp" >
-        <EditText
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="10px"
-            android:ems="2"
-            android:maxLength="2"
-            android:inputType="number"
-            android:enabled="false"
-            android:visibility="invisible"
+            android:layout_height="?android:attr/actionBarSize"
+            android:background="?android:toolbarStyle"
+            android:elevation="4dp"
             />
-        <EditText
-            android:layout_width="wrap_content"
+
+        <LinearLayout
+            android:id="@+id/oben"
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="10px"
-            android:ems="6"
-            android:maxLength="10"
-            android:clickable="true"
-            android:onClick="clicked"
-            android:focusableInTouchMode="false"
-            android:cursorVisible="false"
-            android:focusable="false"
-            android:text="Summe :"
-            />
-        <EditText
-            android:layout_width="wrap_content"
+            android:layout_below="@+id/toolbar"
+            android:layout_above="@+id/unten"
+            >
+
+            <ScrollView
+                android:id="@+id/scroll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                >
+            </ScrollView>
+        </LinearLayout>
+        <LinearLayout
+            android:id="@+id/unten"
+            android:orientation="vertical"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="10px"
-            android:ems="4"
-            android:maxLength="7"
-            android:inputType="numberDecimal"
-            android:enabled="false"
-            android:visibility="invisible"
-            />
-        <EditText
-            android:id="@+id/preisgessum"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="right"
-            android:layout_marginRight="10px"
-            android:clickable="false"
-            android:focusableInTouchMode="false"
-            android:cursorVisible="false"
-            android:focusable="false"
-            android:gravity="right"
-            android:ems="4"
-            android:maxLength="6"
-                />
-    </LinearLayout>
-    </LinearLayout>
-</RelativeLayout>
+            android:layout_alignParentBottom="true">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:background="#dddddddd"
+                android:layout_above="@+id/ganzunten"
+                android:layout_marginLeft="40dp"
+                android:layout_marginTop="25dp"
+                android:layout_marginBottom="25dp"
+                android:layout_marginRight="40dp" />
+            <LinearLayout
+                android:id="@+id/ganzunten"
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="25dp" >
+                <EditText
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="10px"
+                    android:ems="2"
+                    android:maxLength="2"
+                    android:inputType="number"
+                    android:enabled="false"
+                    android:visibility="invisible"
+                    />
+                <EditText
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="10px"
+                    android:ems="6"
+                    android:maxLength="10"
+                    android:clickable="true"
+                    android:onClick="clicked"
+                    android:focusableInTouchMode="false"
+                    android:cursorVisible="false"
+                    android:focusable="false"
+                    android:text="Summe :"
+                    />
+                <EditText
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="10px"
+                    android:ems="4"
+                    android:maxLength="7"
+                    android:inputType="numberDecimal"
+                    android:enabled="false"
+                    android:visibility="invisible"
+                    />
+                <EditText
+                    android:id="@+id/preisgessum"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="right"
+                    android:layout_marginRight="10px"
+                    android:clickable="false"
+                    android:focusableInTouchMode="false"
+                    android:cursorVisible="false"
+                    android:focusable="false"
+                    android:gravity="right"
+                    android:ems="4"
+                    android:maxLength="6"
+                    />
+            </LinearLayout>
+        </LinearLayout>
+
+    </RelativeLayout>
+</FrameLayout>
